@@ -1,11 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
-from scipy.constants import pi
 from scipy.interpolate import interp1d
 import matplotlib.animation as animation
 
-colors = ['#003D5B', '#D1495B', '#EDAE49', '#00798C', '#401F3E'] 
+colors = ['#003D5B', '#D1495B', '#EDAE49', '#00798C', '#401F3E']
 
 class DiffusionSimulator():
 
@@ -24,7 +23,7 @@ class DiffusionSimulator():
         self.DiffusionCoefficient = D
 
     def generation_motion_rectangle(self, x_limit:float=1e-6):
-        
+
         n = int(self.TotalTime/self.TimeSteps)
         x, y = np.zeros(n), np.zeros(n)
         old_x, old_y = 0, 0
@@ -80,7 +79,7 @@ class DiffusionSimulator():
             msd = np.mean(np.sum(xsquared + ysquared))
             MSD[i] = msd
         return MSD[1:]
-    
+
 
 
 
@@ -89,39 +88,42 @@ if __name__ == "__main__":
     ################
     ### Numéro 1 ###
     ################
-    # dt=0.01
-    # D=2.5e-13
-    # t=20
-    # dx=2e-9
-    # Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
-    # time_array = np.linspace(0,Simulation.TotalTime,
-    #                         int(Simulation.TotalTime/Simulation.TimeSteps))
-    # Simulation.generation_motion_rectangle(np.inf)
-    # x,y = Simulation.data
+    dt=0.01
+    D=2.5e-13
+    t=20
+    dx=2e-9
+    Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
+    time_array = np.linspace(0,Simulation.TotalTime,
+                            int(Simulation.TotalTime/Simulation.TimeSteps))
+    Simulation.generation_motion_rectangle(np.inf)
+    x,y = Simulation.data
 
-    # fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2) = plt.subplots(1, 2)
 
-    # ax1.plot(x, y)
-    # ax1.set_aspect('equal')
-    # ax1.set_xlabel("Position [m]")
-    # ax1.set_ylabel("Position [m]")
-    # ax1.minorticks_on()
-    
-    # def droite(x,a,b):
-    #     return 4*a*x + b
+    ax1.plot(x, y)
+    ax1.set_aspect('equal')
+    ax1.set_xlabel("Position [m]")
+    ax1.set_ylabel("Position [m]")
+    ax1.minorticks_on()
 
-    # popt, pcov = curve_fit(droite, time_array[:-1],
-    #                        Simulation.MeanSquareDisplacement())
-    
-    # print(f"Le coefficient de diffusion est de ({popt[0]} ± {np.diag(pcov)[0]}).")
-    
-    # ax2.plot(time_array[:-1], Simulation.MeanSquareDisplacement())
-    # ax2.plot(time_array, droite(time_array, *popt))
-    # ax2.set_xlabel("Time [s]")
-    # ax2.set_ylabel("MSD")
-    # ax2.minorticks_on()
-    # plt.tight_layout()
-    # plt.show()
+    def droite(x,a,b):
+        return 4*a*x + b
+
+    popt, pcov = curve_fit(droite, time_array[:-1],
+                           Simulation.MeanSquareDisplacement())
+
+    print(f"Le coefficient de diffusion est de ({popt[0]} ± {np.diag(pcov)[0]}).")
+
+    ax2.plot(time_array[:-1], Simulation.MeanSquareDisplacement(),
+             label="Raw data")
+    ax2.plot(time_array, droite(time_array, *popt), label="Curve fit")
+    ax2.set_xlabel("Time [s]")
+    ax2.set_ylabel("MSD")
+    ax2.minorticks_on()
+    ax2.legend()
+    plt.tight_layout()
+    plt.savefig("figures/simulateur1/numéro1.pdf")
+    plt.show()
 
 
     # ################
@@ -158,10 +160,14 @@ if __name__ == "__main__":
 
 
     # ax2.plot(time_array[3:], msd_list[3:])
+    # ax2.axhline(D,c=colors[0])
+    # ax2.fill_between(time_array, D*0.95, D*1.05, alpha=0.3,
+    #                  label="Real coefficient ± 5%", color=colors[0])
     # ax2.set_xlabel("Time [s]")
-    # ax2.set_ylabel("MSD")
+    # ax2.set_ylabel("Doffusion coefficient")
     # ax2.minorticks_on()
     # plt.tight_layout()
+    # plt.savefig("figures/simulateur1/numéro2.pdf")
     # plt.show()
 
 
@@ -169,50 +175,48 @@ if __name__ == "__main__":
     ################
     ### Numéro 3 ###
     ################
-    precision = np.linspace(0, 1e-7, 5)
-    msd_list = []
-    msd_list_uncert = []
-    for i in precision:
-        dt=0.01
-        D=2.5e-13
-        t=20
-        Simulation = DiffusionSimulator(t=t, dt=dt, dx=i, D=D)
-        time_array = np.linspace(0,Simulation.TotalTime,
-                                int(Simulation.TotalTime/Simulation.TimeSteps))
-        Simulation.generation_motion_rectangle(np.inf)
-        x,y = Simulation.data
+    # precision = np.linspace(0, 1e-7, 100)
+    # msd_list = []
+    # msd_list_uncert = []
+    # for i in precision:
+    #     dt=0.01
+    #     D=2.5e-13
+    #     t=20
+    #     Simulation = DiffusionSimulator(t=t, dt=dt, dx=i, D=D)
+    #     time_array = np.linspace(0,Simulation.TotalTime,
+    #                             int(Simulation.TotalTime/Simulation.TimeSteps))
+    #     Simulation.generation_motion_rectangle(np.inf)
+    #     x,y = Simulation.data
 
-        def droite(x,a,b):
-            return 4*a*x + b
+    #     def droite(x,a,b):
+    #         return 4*a*x + b
 
-        popt, pcov = curve_fit(droite, time_array[:-1],
-                            Simulation.MeanSquareDisplacement())
+    #     popt, pcov = curve_fit(droite, time_array[:-1],
+    #                         Simulation.MeanSquareDisplacement())
 
-        msd_list.append(popt[0])
-        msd_list_uncert.append(np.diag(pcov)[0])
-    
-        plt.plot(time_array[:-1], Simulation.MeanSquareDisplacement(), label=i)
-    plt.legend()
-    plt.ylabel("MSD")
-    plt.xlabel("Time [s]")
-    plt.title("MSD as a function of time for different precision of localisation.")
-    plt.tight_layout()
-    plt.show()
+    #     msd_list.append(popt[0])
+    #     msd_list_uncert.append(np.diag(pcov)[0])
 
-    print(msd_list)
-    print(msd_list_uncert)
-       
-
-    plt.plot(precision, msd_list)
-    plt.minorticks_on()
-    plt.xlabel("Precision of localisation")
-    plt.ylabel("MSD")
-    plt.axhline(D, label="Diffusion coefficient", c="r")
-    plt.legend()
-    plt.show()
-        
+    # #     plt.plot(time_array[:-1], Simulation.MeanSquareDisplacement(), label=i)
+    # # plt.legend()
+    # # plt.ylabel("MSD")
+    # # plt.xlabel("Time [s]")
+    # # plt.title("MSD as a function of time for different precision of localisation.")
+    # # plt.tight_layout()
+    # # plt.show()
 
 
+    # plt.plot(precision, msd_list, c=colors[1])
+    # plt.minorticks_on()
+    # plt.xlabel("Precision of localisation [m]")
+    # plt.ylabel("Diffusion coefficient")
+    # plt.axhline(D,c=colors[0])
+    # plt.fill_between(precision, D*0.95, D*1.05, alpha=0.3,
+    #                  label="Real coefficient ± 5%", color=colors[0])
+    # plt.legend()
+    # plt.tight_layout()
+    # plt.savefig("figures/simulateur1/numéro3.pdf")
+    # plt.show()
 
 
 
@@ -252,7 +256,6 @@ if __name__ == "__main__":
     # ax2.set_xlabel("Time [s]")
     # ax2.set_ylabel("MSD")
     # ax2.minorticks_on()
-
     # plt.tight_layout()
+    # plt.savefig("figures/simulateur1/numéro4.pdf")
     # plt.show()
-
