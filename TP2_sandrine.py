@@ -39,28 +39,31 @@ class DiffusionSimulator():
             angle = np.arctan(r2/r1)
 
             if new_x > x_limit/2:
+                angle_normal = np.arctan(new_y/new_x)
                 temp_y = interp1d([old_x, new_x], [old_y, new_y],fill_value="extrapolate")(x_limit/2)
                 temp_x = x_limit/2
                 initial_to_wall = np.sqrt((temp_y - old_y)**2 + (temp_x - old_x)**2)
 
                 final_dist_remaining = r - initial_to_wall
-                new_angle = np.pi - angle
+                new_angle = angle_normal - angle
 
                 new_x = temp_x + final_dist_remaining*np.cos(new_angle)
                 new_y = temp_y + final_dist_remaining*np.sin(new_angle)
 
             if new_x < -x_limit/2:
-
+                angle_normal = np.arctan(new_y/new_x)
                 temp_y = interp1d([old_x, new_x], [old_y, new_y],fill_value="extrapolate")(-x_limit/2)
                 temp_x = -x_limit/2
                 initial_to_wall = np.sqrt((temp_y - old_y)**2 + (temp_x - old_x)**2)
 
                 final_dist_remaining = r - initial_to_wall
-                new_angle = (np.pi) - angle
+                new_angle =  angle_normal - angle
 
                 new_x = temp_x + final_dist_remaining*np.cos(new_angle)
                 new_y = temp_y + final_dist_remaining*np.sin(new_angle)
-
+            
+            new_x = np.clip(new_x,-x_limit/2,x_limit/2)
+            new_y = np.clip(new_y,-y_limit/2,y_limit/2)
             x[i], old_x = new_x, new_x
             y[i], old_y = new_y, new_y
 
@@ -111,10 +114,10 @@ Diff = []
 
 # T = np.linspace(2,30)
 T = np.linspace(1,200)
-# T = [1]
+T = [50]
 for t in T:
     Ds = []
-    for _ in range(10):
+    for _ in range(1):
         dt=0.01
         D=2.5e-13
         # t=20
@@ -123,17 +126,17 @@ for t in T:
         time_array = np.linspace(0,Simulation.TotalTime,
                                 int(Simulation.TotalTime/Simulation.TimeSteps))
         # Simulation.GenerateMotion()   # Uncomment for og
-        Simulation.generation_motion_rectangle(np.inf,np.inf) # uncomment this for limits
+        Simulation.generation_motion_rectangle(1e-6,np.inf) # uncomment this for limits
         x,y = Simulation.data
-        # plt.plot(x*1e6,y*1e6,color = colors[0])
-        # plt.title("Free 2D diffusion")
-        # plt.xlabel(r"Position [$\mu$m]")
-        # plt.ylabel(r"Position [$\mu$m]")
-        # # plt.axvline(1/2)
-        # # plt.axvline(-1/2)
-        # plt.gca().ticklabel_format(style='sci', scilimits=(0, 0))
-        # # plt.savefig('Diffusion_example_rec.pdf')
-        # plt.show()
+        plt.plot(x*1e6,y*1e6,color = colors[0])
+        plt.title("Free 2D diffusion")
+        plt.xlabel(r"Position [$\mu$m]")
+        plt.ylabel(r"Position [$\mu$m]")
+        # plt.axvline(1/2)
+        # plt.axvline(-1/2)
+        plt.gca().ticklabel_format(style='sci', scilimits=(0, 0))
+        # plt.savefig('Diffusion_example_rec.pdf')
+        plt.show()
 
         msd = Simulation.MeanSquareDisplacement()
         msd_2x, msd_2y = MSD1D(x,y)
@@ -147,24 +150,24 @@ for t in T:
         # print(fit2/(4*dt))
 
 
-    # plt.plot(time_array[1:], msd*(1e6)**2,color = colors[0], label = 'Simulation')
-    # # plt.plot(time_array,msd_2x)
-    # # plt.plot(time_array,msd_2y)
-    # plt.plot(time_array, droite(time_array*(1e6)**2,d,fit[1]), color = colors[2], ls = '--',alpha=0.6, label = f'MSD=4Dt')
-    # plt.grid(alpha = 0.9, ls='--')
-    # plt.xlabel('Temps (s)')
-    # plt.legend()
-    # plt.ylabel(r'MSD ($\mu$m$^2$)')
-    # # plt.savefig('curve_fit_rec.pdf')
-    # # plt.plot(time_array[1:],msd_2)
-    # plt.show()
-# print(d)
+    plt.plot(time_array[1:], msd*(1e6)**2,color = colors[0], label = 'Simulation')
+    plt.plot(time_array,msd_2x*(1e6)**2)
+    plt.plot(time_array,msd_2y*(1e6)**2)
+    plt.plot(time_array, droite(time_array*(1e6)**2,d,fit[1]), color = colors[2], ls = '--',alpha=0.6, label = f'MSD=4Dt')
+    plt.grid(alpha = 0.9, ls='--')
+    plt.xlabel('Temps (s)')
+    plt.legend()
+    plt.ylabel(r'MSD ($\mu$m$^2$)')
+    # plt.savefig('curve_fit_rec.pdf')
+    # plt.plot(time_array[1:],msd_2)
+    plt.show()
+print(d)
 
-plt.scatter(T,Diff,color = colors[0])
-plt.xlabel('Temps de simulation (s)')
-plt.ylabel(r'Estimation de D (m$^2$/s)')
-plt.savefig('1B.pdf')
-plt.show()
+# plt.scatter(T,Diff,color = colors[0])
+# plt.xlabel('Temps de simulation (s)')
+# plt.ylabel(r'Estimation de D (m$^2$/s)')
+# plt.savefig('1B.pdf')
+# plt.show()
 
 def MeanSquaredDisplacement2D(position_x, position_y):
     squared_position_x = np.square(position_x)
