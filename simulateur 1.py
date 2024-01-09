@@ -75,10 +75,12 @@ class DiffusionSimulator():
         """
         X, Y= self.data
         MSD = np.empty(X.shape[0])
+        xsquared = X**2
+        ysquared = Y**2
         for i in range(1,X.shape[0]):
-            xsquared = np.diff(X[:i])**2
-            ysquared = np.diff(Y[:i])**2
-            msd = np.mean(np.sum(xsquared + ysquared))
+            # xsquared = xsquared[i]
+            # ysquared = ysquared[i]
+            msd = np.mean(np.sum(xsquared[i] + ysquared[i]))
             MSD[i] = msd
         return MSD[1:]
 
@@ -87,6 +89,14 @@ class DiffusionSimulator():
 
 if __name__ == "__main__":
 
+    def rms(values):
+        n = values.size
+        rms_val = np.empty(n)
+        squared_values = np.square(values)
+        for i in range(n):
+            rms_val[i] = np.sqrt(np.mean(squared_values[:i]))
+        return rms_val
+
     ################
     ### Numéro 1 ###
     ################
@@ -94,10 +104,11 @@ if __name__ == "__main__":
     D=2.5e-13
     t=20
     dx=2e-9
+    itt = 1000
     
-    msd_array = np.empty((30, int(t/dt)-1))
+    msd_array = np.empty((itt, int(t/dt)-1))
 
-    for i in range(30):
+    for i in tqdm(range(itt)):
         Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
         time_array = np.linspace(0,Simulation.TotalTime,
                                 int(Simulation.TotalTime/Simulation.TimeSteps))
@@ -106,7 +117,7 @@ if __name__ == "__main__":
         msd_array[i] = Simulation.MeanSquareDisplacement()
 
     msd_mean = np.mean(msd_array, axis=0)
-    msd_erro = np.std(msd_array, axis=0)
+    msd_erro = rms(msd_mean)
 
     fig, (ax1, ax2) = plt.subplots(1, 2)
 
@@ -114,6 +125,7 @@ if __name__ == "__main__":
     ax1.set_aspect('equal')
     ax1.set_xlabel("Position [m]")
     ax1.set_ylabel("Position [m]")
+    ax1.set_title("A")
     ax1.minorticks_on()
 
     def droite(x,a,b):
@@ -123,16 +135,13 @@ if __name__ == "__main__":
 
     print(f"Le coefficient de diffusion est de ({popt[0]} ± {np.diag(pcov)[0]}).")
 
-    ax2.fill_between(time_array[:-1], msd_mean+msd_erro, msd_mean-msd_erro,
-                     color=colors[1], alpha=0.3)
+    # ax2.fill_between(time_array[:-1], msd_mean+msd_erro, msd_mean-msd_erro,
+    #                  color=colors[1], alpha=0.3)
     ax2.plot(time_array[:-1], msd_mean, c=colors[1])
-    # ax2.plot(time_array[:-1], Simulation.MeanSquareDisplacement(),
-    #          label="Raw data")
-    # ax2.plot(time_array, droite(time_array, *popt), label="Curve fit")
     ax2.set_xlabel("Time [s]")
-    ax2.set_ylabel("MSD")
+    ax2.set_ylabel("MSD [m²]")
     ax2.minorticks_on()
-    # ax2.legend()
+    ax2.set_title("B")
     plt.tight_layout()
     plt.savefig("figures/simulateur1/numéro1.pdf")
     plt.show()
@@ -143,14 +152,15 @@ if __name__ == "__main__":
     # ################
     # dt=0.01
     # D=2.5e-13
-    # t=10
+    # t=3
     # dx=2e-9
-    # diff_coef = np.empty((30, int(t/dt)))
+    # itt = 1000
+    # diff_coef = np.empty((itt, int(t/dt)))
 
     # def droite(x,a,b):
     #     return 4*a*x + b
 
-    # for j in tqdm(range(30)):
+    # for j in tqdm(range(itt)):
     #     Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
     #     time_array = np.linspace(0,Simulation.TotalTime,
     #                             int(Simulation.TotalTime/Simulation.TimeSteps))
@@ -166,22 +176,30 @@ if __name__ == "__main__":
     #     diff_coef[j, :] = temp_diff_coeff
 
     # diff_coef_mean = np.mean(diff_coef, axis=0)
-    # diff_coef_std = np.std(diff_coef, axis=0)
+    # diff_coef_rms = rms(diff_coef_mean)
     # fig, (ax1, ax2) = plt.subplots(1, 2)
+
+    # for i in enumerate(time_array):
+    #     if diff_coef_mean[i[0]] < 1.01*D and diff_coef_mean[i[0]] > 0.99*D:
+    #         print("TIME", i[1])
+
+
 
     # ax1.plot(x, y, c=colors[0])
     # ax1.set_aspect('equal')
     # ax1.set_xlabel("Position [m]")
     # ax1.set_ylabel("Position [m]")
+    # ax1.set_title("A")
     # ax1.minorticks_on()
 
-    # ax2.fill_between(time_array, diff_coef_mean + diff_coef_std,
-    #                   diff_coef_mean-diff_coef_std, alpha=0.3, color=colors[1])
+    # # ax2.fill_between(time_array, diff_coef_mean + diff_coef_rms,
+    # #                   diff_coef_mean-diff_coef_rms, alpha=0.3, color=colors[1])
     # ax2.plot(time_array, diff_coef_mean, c=colors[1])
     # ax2.axhline(D,c=colors[0])
     # ax2.set_xlabel("Time [s]")
     # ax2.set_ylabel("Diffusion coefficient [m²/s]")
     # ax2.minorticks_on()
+    # ax2.set_title("B")
     # plt.tight_layout()
     # plt.savefig("figures/simulateur1/numéro2.pdf")
     # plt.show()
@@ -191,10 +209,11 @@ if __name__ == "__main__":
     ################
     ### Numéro 3 ###
     ################
-    # precision = np.linspace(0, 1e-7, 100)
-    # coeff_array = np.empty((30, 100))
+    # precision = np.linspace(0, 1e-7, 20)
+    # itt = 1000
+    # coeff_array = np.empty((itt, 20))
 
-    # for j in tqdm(range(30)):
+    # for j in tqdm(range(itt)):
     #     temp_coeff = []
     #     for i in precision:
     #         dt=0.01
@@ -217,9 +236,16 @@ if __name__ == "__main__":
 
 
     # coeff_mean = np.mean(coeff_array, axis=0)
-    # coeff_std = np.std(coeff_array, axis=0)
-    # plt.fill_between(precision, coeff_mean+coeff_std,
-    #                  coeff_mean-coeff_std, alpha=0.3, color=colors[1])
+    # coeff_rms = rms(coeff_mean)
+
+    # def quadra(x, a, b, c):
+    #     return a*x**2 + b*x + c
+    
+    # popt, pcov = curve_fit(quadra, precision, coeff_mean)
+    # print(popt)
+
+    # # plt.fill_between(precision, coeff_mean+coeff_rms,
+    # #                  coeff_mean-coeff_rms, alpha=0.3, color=colors[1])
     # plt.plot(precision, coeff_mean, c=colors[1])
     # plt.minorticks_on()
     # plt.xlabel("Precision of localisation [m]")
