@@ -4,6 +4,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 import matplotlib.animation as animation
 from scipy.constants import pi
+from tqdm import tqdm
 
 colors = ['#003D5B', '#D1495B', '#EDAE49', '#00798C', '#401F3E']
 
@@ -122,16 +123,20 @@ class DiffusionSimulator():
             np.array: Array containing the MSD
         """
         X, Y= self.data
-        MSD = np.empty(X.shape[0])
+        MSD = np.zeros(X.shape[0])
         for i in range(1,X.shape[0]):
             xsquared = np.diff(X[:i])**2
             ysquared = np.diff(Y[:i])**2
-            msd = np.mean(np.sum(xsquared + ysquared))
+            xsquared = X[i]**2
+            ysquared = Y[i]**2
+            msd = np.mean(xsquared + ysquared)
             MSD[i] = msd
-        return MSD[1:]
+    
+        return MSD
 
 
-
+def msd_fit(x,a,b):
+    return a*x+b
 
 if __name__ == "__main__":
 
@@ -140,34 +145,51 @@ if __name__ == "__main__":
     ### Numéro 4 ###
     ################
     dt=0.01
+
     D=2.5e-13
-    t=20
+    t=10
     dx=2e-9
-    Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
-    time_array = np.linspace(0,Simulation.TotalTime,
-                            int(Simulation.TotalTime/Simulation.TimeSteps))
-    Simulation.generation_motion_rectangle(1e-6)
-    x,y = Simulation.data
+    reps=1000
+    msdx,msdy = [],[]
+    for i in tqdm(range(reps)):
+        Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
+        time_array = np.linspace(0,Simulation.TotalTime,
+                                int(Simulation.TotalTime/Simulation.TimeSteps))
+        Simulation.generation_motion_circle(2e-6)
+        x,y = Simulation.data
+        # msd.append(Simulation.MeanSquareDisplacement())
+        
+        x_msd = np.zeros(x.shape[0])
+        y_msd = np.zeros(x.shape[0])
+        for i in range(1,x_msd.shape[0]):
+            # xsquared = np.diff(x[:i])**2
+            # ysquared = np.diff(y[:i])**2
+            xsquared = x[i]**2
+            ysquared = y[i]**2
+            x_msd[i] = np.mean(np.sum(xsquared))
+            y_msd[i] = np.mean(np.sum(ysquared))
+        msdx.append(x_msd)
+        msdy.append(y_msd)
 
+    # msd = np.average(msd, axis = 0)
+    # (a,b), pcoov = curve_fit(msd_fit, time_array,msd)
+    msdx = np.average(msdx,axis=0)
+    msdy = np.average(msdy,axis=0)
 
-    x_msd = np.empty(x.shape[0])
-    y_msd = np.empty(x.shape[0])
-    for i in range(1,x_msd.shape[0]):
-        xsquared = np.diff(x[:i])**2
-        ysquared = np.diff(y[:i])**2
-        xsquared = x[:i]**2
-        ysquared = y[:i]**2
-        x_msd[i] = np.mean(np.sum(xsquared))
-        y_msd[i] = np.mean(np.sum(ysquared))
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig = plt.figure(figsize =(12,6))
+    ax1, ax2 = fig.subplots(1, 2)
+
     ax1.plot(x, y)
     ax1.set_xlabel("Position [m]")
     ax1.set_ylabel("Position [m]")
     # ax1.add_patch(plt.Circle((0,0),2e-6,fill=False,color = colors[4]))
     ax1.minorticks_on()
 
-    ax2.plot(time_array, x_msd, label="x component")
-    ax2.plot(time_array, y_msd, label="y component")
+
+    ax2.plot(time_array, msdy, label="y component")
+    ax2.plot(time_array, msdx, label="x component")
+    # ax2.plot(time_array,msd, color = colors[0],label='Simulation')
+    # ax2.plot(time_array,msd_fit(time_array,a,b),color=colors[3],label=f'Fit, D={a/4}',alpha=0.4,ls='--')
     ax2.legend()
     ax2.set_xlabel("Time [s]")
     ax2.set_ylabel("MSD")
