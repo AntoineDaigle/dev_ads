@@ -144,12 +144,12 @@ if __name__ == "__main__":
     ################
     ### Numéro 4 ###
     ################
-    dt=0.001
-
+    dt=0.01
     D=2.5e-13
     t=20
     dx=2e-9
-    reps=1
+    reps=1000
+
     msdx,msdy, msd = [],[],[]
     for i in tqdm(range(reps)):
         Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
@@ -158,27 +158,37 @@ if __name__ == "__main__":
         Simulation.generation_motion_rectangle(np.inf)
         data = Simulation.data
         x,y = data
+<<<<<<< Updated upstream
         np.save('data_free.npy', data)
+=======
+        # np.save('data_cercle.npy', data)
+>>>>>>> Stashed changes
 
-    #     msd.append(Simulation.MeanSquareDisplacement())
+        msd.append(Simulation.MeanSquareDisplacement())
         
-    #     x_msd = np.zeros(x.shape[0])
-    #     y_msd = np.zeros(x.shape[0])
-    #     for i in range(1,x_msd.shape[0]):
-    #         # xsquared = np.diff(x[:i])**2
-    #         # ysquared = np.diff(y[:i])**2
-    #         xsquared = x[i]**2
-    #         ysquared = y[i]**2
-    #         x_msd[i] = np.mean(np.sum(xsquared))
-    #         y_msd[i] = np.mean(np.sum(ysquared))
-    #     msdx.append(x_msd)
-    #     msdy.append(y_msd)
+        x_msd = np.zeros(x.shape[0])
+        y_msd = np.zeros(x.shape[0])
+        for i in range(1,x_msd.shape[0]):
+            # xsquared = np.diff(x[:i])**2
+            # ysquared = np.diff(y[:i])**2
+            xsquared = x[i]**2
+            ysquared = y[i]**2
+            x_msd[i] = np.mean(np.sum(xsquared))
+            y_msd[i] = np.mean(np.sum(ysquared))
+        msdx.append(x_msd)
+        msdy.append(y_msd)
 
-    # msd = np.average(msd, axis = 0)
-    # # (a,b), pcoov = curve_fit(msd_fit, time_array,msd)
-    # msdx = np.average(msdx,axis=0)
-    # msdy = np.average(msdy,axis=0)
-    # (a,b),pcov = curve_fit(msd_fit,time_array,msdy)
+    msd = np.average(msd, axis = 0)
+    # (a,b), pcoov = curve_fit(msd_fit, time_array,msd)
+    msdx = np.average(msdx,axis=0)
+    msdy = np.average(msdy,axis=0)
+    (a,b),pcov = curve_fit(msd_fit,time_array,msdy)
+    np.save('msd_xcir.npy', msdx)
+    np.save('msd_ycir.npy', msdy)
+    np.save('msd_cir.npy', msd)
+    
+    plateau = int(2/dt)
+    average = msdx[plateau:]
 
     fig = plt.figure(figsize =(20,6))
     ax1, ax3,ax2 = fig.subfigures(1, 3)
@@ -192,30 +202,31 @@ if __name__ == "__main__":
     # ax1.add_patch(plt.Circle((0,0),2,fill=False,color = colors[4],ls='--'))
     ax1.minorticks_on()
     ax1.set_title('Example trace')
+
+    ax3 = ax3.subplots(1,1)
+
+    ax3.plot(time_array, msd*1e6**2, color = colors[1])
+    ax3.set_xlabel('Time [s]')
+    ax3.set_ylabel(f'MSD [$\mu$m$^2$]')
+    ax3.minorticks_on()
+    ax3.set_title('MSD curve')
+
+    ax21, ax22 = ax2.subplots(2,1)
+    ax21.plot(time_array, msdy*(1e6)**2, label=f"y component", color=colors[0])
+    ax22.plot(time_array, msdx*(1e6)**2, label="x component",color=colors[2])
+    # ax2.plot(time_array,msd, color = colors[0],label='Simulation')
+    # ax2.plot(time_array,msd_fit(time_array,a,b),color=colors[3],label=f'Fit, D={a/4}',alpha=0.4,ls='--')
+    # ax21.legend()
+    # ax22.legend()
+    ax21.set_title(f'Y component (D = {np.round(a/2*1e13,3)}e-13m$^2$/s)')
+    ax22.set_title('X component')
+    ax22.set_xlabel("Time [s]")
+    ax21.set_ylabel(r"MSD [$\mu$m$^2$]")
+    ax22.set_ylabel(r"MSD [$\mu$m$^2$]")
+    ax21.minorticks_on()
+    ax22.minorticks_on()
+    # plt.tight_layout()
+    # plt.savefig("figures/simulateur1/confinement_rectangle.pdf")
     plt.show()
 
-    # ax3 = ax3.subplots(1,1)
 
-    # ax3.plot(time_array, msd*1e6**2, color = colors[1])
-    # ax3.set_xlabel('Time [s]')
-    # ax3.set_ylabel(f'MSD [$\mu$m$^2$]')
-    # ax3.minorticks_on()
-    # ax3.set_title('MSD curve')
-
-    # ax21, ax22 = ax2.subplots(2,1)
-    # ax21.plot(time_array, msdy*(1e6)**2, label=f"y component", color=colors[0])
-    # ax22.plot(time_array, msdx*(1e6)**2, label="x component",color=colors[2])
-    # # ax2.plot(time_array,msd, color = colors[0],label='Simulation')
-    # # ax2.plot(time_array,msd_fit(time_array,a,b),color=colors[3],label=f'Fit, D={a/4}',alpha=0.4,ls='--')
-    # # ax21.legend()
-    # # ax22.legend()
-    # ax21.set_title(f'Y component (D = {np.round(a/2*1e13,3)}e-13m$^2$/s)')
-    # ax22.set_title('X component')
-    # ax22.set_xlabel("Time [s]")
-    # ax21.set_ylabel(r"MSD [$\mu$m$^2$]")
-    # ax22.set_ylabel(r"MSD [$\mu$m$^2$]")
-    # ax21.minorticks_on()
-    # ax22.minorticks_on()
-    # # plt.tight_layout()
-    # plt.savefig("figures/simulateur1/confinement_rectangle.pdf")
-    # plt.show()

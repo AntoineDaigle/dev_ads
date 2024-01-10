@@ -22,18 +22,15 @@ if np.abs(x1**2 + y1**2) > radius:
     final_dist_remaining = r - initial_to_wall
     #conditions selon le cadran
     
-    phi = np.arctan(tempy/tempx)%(2*np.pi)
+    phi = np.arctan(tempy/tempx)
+
     if tempy>0 and tempx>0:
-        print('quadrant 1')
         new_angle = 2*phi - angle + np.pi
     if tempy>0 and tempx<0:
-        print('quadrant 2')
         new_angle = 2*phi - angle
     if tempy<0 and tempx<0:
-        print('quadrant 3')
         new_angle = 2*phi - angle
     if tempy<0 and tempx>0:
-        print('quadrant 4')
         new_angle = 2*phi - angle + np.pi
     new_x = tempx + final_dist_remaining*np.cos(new_angle)
     new_y = tempy + final_dist_remaining*np.sin(new_angle)
