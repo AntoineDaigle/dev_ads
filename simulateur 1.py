@@ -155,10 +155,10 @@ if __name__ == "__main__":
         Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
         time_array = np.linspace(0,Simulation.TotalTime,
                                 int(Simulation.TotalTime/Simulation.TimeSteps))
-        Simulation.generation_motion_circle(2e-6)
+        Simulation.generation_motion_rectangle(np.inf)
         data = Simulation.data
         x,y = data
-        np.save('data_cercle.npy', data)
+        np.save('data_free.npy', data)
 
     #     msd.append(Simulation.MeanSquareDisplacement())
         
