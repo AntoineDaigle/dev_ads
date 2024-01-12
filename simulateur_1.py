@@ -144,10 +144,10 @@ if __name__ == "__main__":
     ################
     ### Numéro 4 ###
     ################
-    dt=0.01
+    dt=0.005
     D=2.5e-13
-    t=20
-    dx=2e-9
+    t=6
+    dx=0
     reps=1000
 
     msdx,msdy, msd = [],[],[]
@@ -155,15 +155,10 @@ if __name__ == "__main__":
         Simulation = DiffusionSimulator(t=t, dt=dt, dx=dx, D=D)
         time_array = np.linspace(0,Simulation.TotalTime,
                                 int(Simulation.TotalTime/Simulation.TimeSteps))
-        Simulation.generation_motion_rectangle(np.inf)
+        Simulation.generation_motion_rectangle(1e-6)
         data = Simulation.data
         x,y = data
-<<<<<<< Updated upstream
-        np.save('data_free.npy', data)
-=======
         # np.save('data_cercle.npy', data)
->>>>>>> Stashed changes
-
         msd.append(Simulation.MeanSquareDisplacement())
         
         x_msd = np.zeros(x.shape[0])
@@ -183,9 +178,9 @@ if __name__ == "__main__":
     msdx = np.average(msdx,axis=0)
     msdy = np.average(msdy,axis=0)
     (a,b),pcov = curve_fit(msd_fit,time_array,msdy)
-    np.save('msd_xcir.npy', msdx)
-    np.save('msd_ycir.npy', msdy)
-    np.save('msd_cir.npy', msd)
+    np.save('data\simulateur 1\msd_xrect.npy', msdx)
+    # np.save('data\simulateur 1\msd_yrec.npy', msdy)
+    # np.save('data\simulateur 1\msd_rec.npy', msd)
     
     plateau = int(2/dt)
     average = msdx[plateau:]
