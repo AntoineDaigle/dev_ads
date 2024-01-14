@@ -4,6 +4,7 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 import matplotlib.animation as animation
 from tqdm import tqdm
+from skimage.morphology import disk
 
 colors = ['#003D5B', '#D1495B', '#EDAE49', '#00798C', '#401F3E']
 
@@ -120,88 +121,140 @@ class DiffusionSimulator():
 
         self.data = (x,y)
 
-particles_density = 20000 #particules par micron
-dt = 0.01
-time = 20
-D = 2.5e-13
-immobility = 0
+class FRAPSimulator():
 
+    def __init__(self, particle_density, time_steps, total_time, diffusion_coefficient, immobility):
+        self.density = particle_density
+        self.dt = time_steps
+        self.t = total_time
+        self.D = diffusion_coefficient
+        self.mobility = 1 - immobility
 
-mobility = 1-immobility
-sigma = 1e-6
-radius = 1e-7
-trajectories = {}
-N = int(particles_density*2*(sigma*1e6))
+    def generate_trajectories(self,interest_zone,frap_radius, confinement_size=np.inf,verbose=True):
+        trajectories={}
+        N = int(self.density*2*(interest_zone*1e6))
+        n = int(self.t/self.dt)
+        if verbose:
+            print('Generating trajectories...')
+        for i in range(N):
+            center = np.random.uniform(-interest_zone,interest_zone,2)
+            # Photobleach particles at the center of the region
+            if (center[0]**2 + center[1]**2) >= frap_radius**2:
+                fluorescence = True
+                    # if particle moves
+                if i < self.mobility*self.density:
+                    Simulator = DiffusionSimulator(self.t,self.dt,self.D,center)
+                    Simulator.generation_motion_circle(confinement_size)
+                    trajectory = Simulator.data
+                # if particle is immobile
+                else:
+                    trajectory = (center[0]*np.ones(n), center[1]*np.ones(n))
+            #photobleached particles don't move
+            else:
+                fluorescence = False
+                trajectory = (center[0]*np.ones(n), center[1]*np.ones(n))
+            particle_data = {}
+            particle_data['trajectory'] = trajectory    
+            particle_data['fluorescence'] = fluorescence
+            trajectories[f'{i}'] = particle_data
+        self.trajectories = trajectories
 
-pixel_size = 0.5e-7
-fov = 0.9*sigma
-pixel_num = int(2*fov/pixel_size)
+    def generate_film(self,fov,pixel_size,filename='FRAP_simulator',saveframe=True,verbose=True):
+        if verbose:
+            print('Generating film...')
+        x = np.mgrid[-fov:fov:pixel_size]
+        images = []
+        pixel_num = int(2*fov/pixel_size)
+        def update(frame_id):
+            image = np.zeros((pixel_num, pixel_num))
+            for id in self.trajectories.keys():
+                particle = self.trajectories[id]
+                if particle['fluorescence'] or frame_id==0:
+                    position = [particle['trajectory'][0][frame_id], particle['trajectory'][1][frame_id]]
+                    if np.abs(position[0]) > fov or np.abs(position[1]) > fov:
+                        continue
+                    ix = find_nearest(x,position[0])
+                    iy = find_nearest(x,position[1])
+                    if ix >= pixel_num:
+                        ix -= 1
+                    if iy >= pixel_num:
+                        iy -= 1
+                    image[ix,iy] += 1
+            images.append(image[1:-1,1:-1])
+            a_image.set_data(image)
 
-
-#generate random trajectories
-print('Generating trajectories...')
-for i in tqdm(range(N)):
-    center = np.random.uniform(-sigma,sigma,2)   
-    
-    # Photobleach particles at the center of the region
-    if (center[0]**2 + center[1]**2) >= radius**2:
-        fluorescence = True
-            # if particle moves
-        if i < mobility*particles_density:
-            Simulator = DiffusionSimulator(time,dt,D,center)
-            Simulator.generation_motion_rectangle(2e-6)
-            trajectory = Simulator.data
-        # if particle is immobile
-        else:
-            trajectory = (center[0]*np.ones(int(time/dt)), center[1]*np.ones(int(time/dt)))
-    
-    #photobleached particles don't move
-    else:
-        fluorescence = False
-        trajectory = (center[0]*np.ones(int(time/dt)), center[1]*np.ones(int(time/dt)))
-
-    particle_data = {}
-    particle_data['trajectory'] = trajectory    
-    particle_data['fluorescence'] = fluorescence
-    trajectories[f'{i}'] = particle_data
-
-
-print('Generating film...')
-x = np.mgrid[-fov:fov:pixel_size]
-y = np.mgrid[-fov:fov:pixel_size]
-images = []
-def update(frame_id):
-    image = np.zeros((pixel_num, pixel_num))
-    for id in trajectories.keys():
-        particle = trajectories[id]
-        if particle['fluorescence']:
-            position = [particle['trajectory'][0][frame_id], particle['trajectory'][1][frame_id]]
+        fig,ax = plt.subplots()
+        image = np.zeros((pixel_num, pixel_num))
+        for id in self.trajectories.keys():
+            particle = self.trajectories[id]
+            position = [particle['trajectory'][0][0], particle['trajectory'][1][0]]
             if np.abs(position[0]) > fov or np.abs(position[1]) > fov:
                 continue
             ix = find_nearest(x,position[0])
             iy = find_nearest(x,position[1])
+            if ix >= pixel_num:
+                ix -= 1
+            if iy >= pixel_num:
+                iy -= 1
             image[ix,iy] += 1
-    images.append(image)
-    a_image.set_data(image)
+        a_image = ax.imshow(image,cmap='gray')
+        ax.axis('off')
+        ani=animation.FuncAnimation(fig=fig,func=update,frames=range(0,int(self.t/self.dt)))
+        ani.save(f'{filename}.gif',writer='pillow')
+        if saveframe:
+            np.save(f'data\images_{filename}_{self.D}.npy', np.array(images))
+        if verbose:
+            print('Done!')
+        return np.array(images)
 
 
-fig,ax = plt.subplots()
-image = np.zeros((pixel_num, pixel_num))
-for id in trajectories.keys():
-    particle = trajectories[id]
-    if particle['fluorescence']:
-        position = [particle['trajectory'][0][90], particle['trajectory'][1][90]]
-        if np.abs(position[0]) > fov or np.abs(position[1]) > fov:
-            continue
-        ix = find_nearest(x,position[0])
-        iy = find_nearest(x,position[1])
-        image[ix,iy] += 1
-    images.append(image)
 
-a_image = ax.imshow(image,cmap='gray')
-ax.axis('off')
-ani=animation.FuncAnimation(fig=fig,func=update,frames=range(0,int(time/dt)),interval=int(dt*1000))
-ani.save('FRAP_simulator.gif',writer='pillow')
-np.save('data\images_FRAP.npy', np.array(images))
+particles_density = 5000 #particules par micron
+dt = 0.001
+time = 5
+D = 1e-13
+immobility = 0
 
-print('Done!')
+sigma = 1e-6
+radius = 0.25e-6
+pixel_size = 0.05e-6
+fov = 2*radius
+confinement = 1*sigma
+
+image_set = []
+for _ in tqdm(range(10)):
+    FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
+    FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
+    images = FRAP.generate_film(fov,pixel_size,saveframe=False,verbose=False)
+    image_set.append(images)
+
+image_set = np.array(image_set)
+
+image_average = np.average(image_set, axis=0)
+np.save('average_set_1.npy', image_average)
+
+
+
+# image_average = np.load('average_set.npy')
+ 
+# radius_pixels = int(radius/pixel_size)
+# pix_num = image_average.shape[1]
+# ROI = np.zeros((pix_num, pix_num)) 
+# ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
+
+# image_average *= ROI
+
+# plt.plot(np.sum(image_average,axis=(1,2)))
+# plt.show()
+
+
+# # def update_image(frame_id):
+# #     image = image_average[frame_id]
+# #     a_image.set_data(image)
+
+# # fig,ax=plt.subplots()
+# # a_image = ax.imshow(image_average[0],cmap='gray')
+# # ax.axis('off')
+# # ani=animation.FuncAnimation(fig=fig,func=update_image,frames=image_average.shape[0],interval=dt*1000)
+# # ani.save('10_simulations.gif',writer='pillow')
+# # plt.show()
