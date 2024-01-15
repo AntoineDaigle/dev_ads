@@ -144,7 +144,7 @@ class FRAPSimulator():
                     # if particle moves
                 if i < self.mobility*self.density:
                     Simulator = DiffusionSimulator(self.t,self.dt,self.D,center)
-                    Simulator.generation_motion_circle(confinement_size)
+                    Simulator.generation_motion_rectangle(confinement_size)
                     trajectory = Simulator.data
                 # if particle is immobile
                 else:
@@ -211,7 +211,7 @@ class FRAPSimulator():
 
 particles_density = 5000 #particules par micron
 dt = 0.001
-time = 5
+time = 3
 D = 1e-13
 immobility = 0
 
@@ -219,33 +219,35 @@ sigma = 1e-6
 radius = 0.25e-6
 pixel_size = 0.05e-6
 fov = 2*radius
-confinement = 1*sigma
+confinement = [np.inf,2*sigma,sigma,2*radius]
 
-image_set = []
-for _ in tqdm(range(10)):
-    FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
-    FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
-    images = FRAP.generate_film(fov,pixel_size,saveframe=False,verbose=False)
-    image_set.append(images)
+# for conf in confinement:
+#     image_set = []
+#     for _ in tqdm(range(10)):
+#         FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
+#         FRAP.generate_trajectories(sigma,radius,conf,verbose=False)
+#         images = FRAP.generate_film(fov,pixel_size,saveframe=False,verbose=False)
+#         image_set.append(images)
+#         plt.close()
 
-image_set = np.array(image_set)
+#     image_set = np.array(image_set)
 
-image_average = np.average(image_set, axis=0)
-np.save('average_set_1.npy', image_average)
+#     image_average = np.average(image_set, axis=0)
+#     np.save(f'average_set_1_{conf}.npy', image_average)
 
 
 
-# image_average = np.load('average_set.npy')
+image_average = np.load(r'data\average_set_1_inf.npy')
  
-# radius_pixels = int(radius/pixel_size)
-# pix_num = image_average.shape[1]
-# ROI = np.zeros((pix_num, pix_num)) 
-# ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
+radius_pixels = int(radius/pixel_size)
+pix_num = image_average.shape[1]
+ROI = np.zeros((pix_num, pix_num)) 
+ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
 
-# image_average *= ROI
+image_average *= ROI
 
-# plt.plot(np.sum(image_average,axis=(1,2)))
-# plt.show()
+plt.plot(np.sum(image_average,axis=(1,2)))
+plt.show()
 
 
 # # def update_image(frame_id):
