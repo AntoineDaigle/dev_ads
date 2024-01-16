@@ -123,9 +123,9 @@ class DiffusionSimulator():
 
         self.data = (x,y)
 
-particles_density = 200 #particules par micron
-dt = 0.01
-time = 3
+particles_density = 10 #particules par micron
+dt = 1e-4
+time = 1
 D = 2.5e-13
 immobility = 0
 
@@ -140,78 +140,86 @@ pixel_size = 0.5e-7
 fov = 0.9*sigma
 pixel_num = int(2*fov/pixel_size)
 
+trials = 10
 
-#generate random trajectories
-print('Generating trajectories...')
-for i in tqdm(range(N)):
-    center = np.random.uniform(-sigma,sigma,2)   
-    
-    # Photobleach particles at the center of the region
-    if (center[0]**2 + center[1]**2) >= radius**2:
-        fluorescence = True
-        # if particle moves
-        if i < mobility*particles_density:
-            Simulator = DiffusionSimulator(time,dt,D,center)
-            Simulator.generation_motion_rectangle(2e-6)
-            trajectory = Simulator.data
-        # if particle is immobile
+
+full_intensities = np.zeros((int(time/dt), trials))
+
+
+for _ in tqdm(range(trials)):
+    #generate random trajectories
+    # print('Generating trajectories...')
+
+    for i in (range(N)):
+        center = np.random.uniform(-sigma,sigma,2)   
+        
+        # Photobleach particles at the center of the region
+        if (center[0]**2 + center[1]**2) >= radius**2:
+            fluorescence = True
+            # if particle moves
+            if i < mobility*particles_density:
+                Simulator = DiffusionSimulator(time,dt,D,center)
+                Simulator.generation_motion_rectangle(2e-6)
+                trajectory = Simulator.data
+            # if particle is immobile
+            else:
+                trajectory = (center[0]*np.ones(int(time/dt)), center[1]*np.ones(int(time/dt)))
+
+        #photobleached particles don't move
         else:
+            fluorescence = False
             trajectory = (center[0]*np.ones(int(time/dt)), center[1]*np.ones(int(time/dt)))
 
-    #photobleached particles don't move
-    else:
-        fluorescence = False
-        trajectory = (center[0]*np.ones(int(time/dt)), center[1]*np.ones(int(time/dt)))
-
-    particle_data = {}
-    particle_data['trajectory'] = trajectory    
-    particle_data['fluorescence'] = fluorescence
-    trajectories[f'{i}'] = particle_data
+        particle_data = {}
+        particle_data['trajectory'] = trajectory    
+        particle_data['fluorescence'] = fluorescence
+        trajectories[f'{i}'] = particle_data
 
 
-print('Generating film...')
-x = np.mgrid[-fov:fov:pixel_size]
-y = np.mgrid[-fov:fov:pixel_size]
-images = []
+    # print('Generating film...')
+    x = np.mgrid[-fov:fov:pixel_size]
+    y = np.mgrid[-fov:fov:pixel_size]
+    images = []
 
 
-def update(frame_id):
+    def update(frame_id):
+        image = np.zeros((pixel_num, pixel_num))
+        for id in trajectories.keys():
+            particle = trajectories[id]
+            if particle['fluorescence']:
+                position = [particle['trajectory'][0][frame_id], particle['trajectory'][1][frame_id]]
+                if np.abs(position[0]) > fov or np.abs(position[1]) > fov:
+                    continue
+                ix = find_nearest(x,position[0])
+                iy = find_nearest(x,position[1])
+                image[ix,iy] += 1
+        images.append(image)
+        return image
+        # a_image.set_data(image)
+
+    gaussian_beam_width = 208e-9 #m
     image = np.zeros((pixel_num, pixel_num))
-    for id in trajectories.keys():
-        particle = trajectories[id]
-        if particle['fluorescence']:
-            position = [particle['trajectory'][0][frame_id], particle['trajectory'][1][frame_id]]
-            if np.abs(position[0]) > fov or np.abs(position[1]) > fov:
-                continue
-            ix = find_nearest(x,position[0])
-            iy = find_nearest(x,position[1])
-            image[ix,iy] += 1
-    images.append(image)
-    return image
-    # a_image.set_data(image)
 
-gaussian_beam_width = 208e-9 #m
-image = np.zeros((pixel_num, pixel_num))
+    circle_center_x = int(pixel_num/2)
+    circle_center_y = int(pixel_num/2)
+    circle_radius = gaussian_beam_width/pixel_size
+    mask = np.zeros_like(image)
+    mask = cv2.circle(mask, (circle_center_x, circle_center_x), int(circle_radius), (255, 255, 255), -1)
+    mask = np.uint8(mask)
+    intensity = []
 
-circle_center_x = int(pixel_num/2)
-circle_center_y = int(pixel_num/2)
-circle_radius = gaussian_beam_width/pixel_size
-mask = np.zeros_like(image)
-mask = cv2.circle(mask, (circle_center_x, circle_center_x), int(circle_radius), (255, 255, 255), -1)
-mask = np.uint8(mask)
-intensity = []
+    for i in range(int(time/dt)):
+        current_image = update(i)
+        intensity.append(np.sum(cv2.bitwise_and(current_image,
+                                                current_image, mask=mask)))
+        
+    full_intensities[:,_] = intensity
 
-for i in range(int(time/dt)):
-    current_image = update(i)
-    intensity.append(np.sum(cv2.bitwise_and(current_image,
-                                            current_image, mask=mask)))
+intensities = np.mean(full_intensities, axis=1)
 
-intensity = intensity-np.mean(intensity)
-intensity = intensity / np.max(intensity)
-autocorr = np.correlate(intensity, intensity, mode='full')
+autocorr = np.correlate(intensities, intensities, mode="full") / (np.mean(intensities)**2)
 
 
-plt.plot(intensity)
-plt.show()
-plt.plot(autocorr)
+plt.plot(np.arange(0,time, dt), autocorr[int(autocorr.size/2):])
+plt.semilogx()
 plt.show()
