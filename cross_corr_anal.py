@@ -39,21 +39,37 @@ def extract_intensity(dataset, gaussian_beam_width=208e-9, pixel_size=0.05e-6,
 
 
 
+def autocorr_article(signal):
+    array_sig = np.asarray(signal)
+    squared_mean = np.square(np.mean(signal))
+    autocorr = []
+    for i in range(len(signal)):
+        pass
+
+    return autocorr
+
+
+
 if __name__ == "__main__":
-    dataset = np.load("average_set_0.5s_10e-5dt.npy")
-
-    intensity = extract_intensity(dataset, mask_validation=False)
-
-    autocorr = np.correlate(intensity, intensity, mode="full")
-    autocorr = autocorr[int(autocorr.size / 2):]
-
-    time_stamp = np.arange(0, 0.5, 1e-5)
 
     fig, (ax1, ax2) = plt.subplots(2)
+    for i in [1e-13, 1e-11]:#, 1e-14, 1e-14, 3e-14, 6e-14]:
 
-    ax1.plot(time_stamp[:-1], intensity)
+        dataset = np.load(f"average_set_10s_0.001dt_{i}D_ANTOINE.npy")
 
-    ax2.plot(time_stamp[:-1], autocorr)
+        intensity = extract_intensity(dataset, mask_validation=False)
+        print(type(intensity))
+        # intensity -= np.mean(intensity)
+        print(autocorr_article(intensity))
+
+        autocorr = np.correlate(intensity, intensity, mode="full")
+        autocorr = autocorr[int(autocorr.size / 2):]
+        time_stamp = np.arange(0, 10, 0.001)
+
+        ax1.plot(time_stamp, intensity)
+        ax2.plot(time_stamp, autocorr/np.max(autocorr), label=i)
+
     ax2.set_xscale("log")
+    ax2.legend()
     plt.tight_layout()
-    plt.show()
+    # plt.show()

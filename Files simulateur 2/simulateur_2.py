@@ -232,32 +232,27 @@ class FRAPSimulator():
             
 
 
-particles_density = 200 #particules par micron
-dt = 0.005
-time = 5
-Ds = [2.5e-13, 1e-13, 0.5e-13,0.25e-13]
+particles_density = 30 #particules par micron
+dt = 1e-3
+time = 10
+Ds = [0.1e-12, 10e-12]
 immobility = 0
 
 sigma = 1e-6
-radius = 0.5e-6
+radius = 0
 pixel_size = 0.1e-6
 fov = 0.8*sigma
 confinement = sigma
 
 # Working many simulations
 
+for D in tqdm(Ds):
+    FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
+    FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
+    images = FRAP.generate_images(fov,pixel_size)
+    plt.close()
+    np.save(f'average_set_{time}s_{dt}dt_{D}D_ANTOINE.npy', images)
 
-for D in Ds:
-    image_set = []
-    for _ in tqdm(range(10)):
-        FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
-        FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
-        images = FRAP.generate_images(fov,pixel_size)
-        image_set.append(images)
-        plt.close()
-    image_set = np.array(image_set)
-    image_average = np.average(image_set, axis=0)
-    np.save(f'average_set_{time}s_{dt}dt_{D}D.npy', image_average)
 
 
 # Tracing FRAP curves, immobility
@@ -301,27 +296,27 @@ for D in Ds:
 # FRAP curves, D
 
 # data = [5.0,2.0,1.0,0.25,0.1]
-i = 0
-for info in Ds:
-    filename = f'average_set_{time}s_{dt}dt_{info}D.npy'
-    image_average = np.load(f'data\simulateur 2\{filename}')
-    radius_pixels = int(radius/pixel_size)
-    pix_num = image_average.shape[1]
-    ROI = np.zeros((pix_num, pix_num)) 
-    ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
-    t_array = np.linspace(0,5,image_average.shape[0])
-    image_average *= ROI
-    trace = np.sum(image_average,axis=(1,2))
-    if info == 2.5e-13:
-        max_value = np.max(trace)
-    plt.plot(t_array,trace/max_value,color=colors[i],label = f'D={round(info*1e12*100)/100}$\mu m^2/s$')
-    i += 1
-plt.minorticks_on()
-plt.xlabel('Time (s)')
-plt.ylabel('Fluorescence normalisée (a.u.)')
-plt.legend()
-plt.savefig('FRAP_D.pdf')
-plt.show()
+# i = 0
+# for info in Ds:
+#     filename = f'average_set_{time}s_{dt}dt_{info}D.npy'
+#     image_average = np.load(f'data\simulateur 2\{filename}')
+#     radius_pixels = int(radius/pixel_size)
+#     pix_num = image_average.shape[1]
+#     ROI = np.zeros((pix_num, pix_num)) 
+#     ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
+#     t_array = np.linspace(0,5,image_average.shape[0])
+#     image_average *= ROI
+#     trace = np.sum(image_average,axis=(1,2))
+#     if info == 2.5e-13:
+#         max_value = np.max(trace)
+#     plt.plot(t_array,trace/max_value,color=colors[i],label = f'D={round(info*1e12*100)/100}$\mu m^2/s$')
+#     i += 1
+# plt.minorticks_on()
+# plt.xlabel('Time (s)')
+# plt.ylabel('Fluorescence normalisée (a.u.)')
+# plt.legend()
+# plt.savefig('FRAP_D.pdf')
+# plt.show()
 
 
 # # FRAP curves, confinement
