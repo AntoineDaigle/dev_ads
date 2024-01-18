@@ -42,9 +42,14 @@ def extract_intensity(dataset, gaussian_beam_width=208e-9, pixel_size=0.05e-6,
 def autocorr_article(signal):
     array_sig = np.asarray(signal)
     squared_mean = np.square(np.mean(signal))
+
+    signal_1 = np.concatenate((np.zeros(array_sig.size), array_sig), axis=None)
+    signal_2 = np.concatenate((array_sig, np.zeros(array_sig.size)), axis=None)
+    
     autocorr = []
     for i in range(len(signal)):
-        pass
+        autocorr.append((np.mean(signal_1 * signal_2) / squared_mean) - 1)
+        signal_2 = np.roll(signal_2, 1)
 
     return autocorr
 
@@ -58,18 +63,21 @@ if __name__ == "__main__":
         dataset = np.load(f"average_set_10s_0.001dt_{i}D_ANTOINE.npy")
 
         intensity = extract_intensity(dataset, mask_validation=False)
-        print(type(intensity))
-        # intensity -= np.mean(intensity)
-        print(autocorr_article(intensity))
+        # print(type(intensity))
+        # # intensity -= np.mean(intensity)
+        autocorr = autocorr_article(intensity)
 
-        autocorr = np.correlate(intensity, intensity, mode="full")
-        autocorr = autocorr[int(autocorr.size / 2):]
+
+        # autocorr = np.correlate(intensity, intensity, mode="full")
+        # autocorr = autocorr[int(autocorr.size / 2):]
+        # autocorr /= np.mean(intensity)**2
+        # autocorr -= 1
         time_stamp = np.arange(0, 10, 0.001)
 
         ax1.plot(time_stamp, intensity)
-        ax2.plot(time_stamp, autocorr/np.max(autocorr), label=i)
+        ax2.plot(time_stamp, autocorr, label=i)
 
     ax2.set_xscale("log")
     ax2.legend()
     plt.tight_layout()
-    # plt.show()
+    plt.show()
