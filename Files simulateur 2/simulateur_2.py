@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 import matplotlib.animation as animation
 from tqdm import tqdm
@@ -229,68 +228,58 @@ class FRAPSimulator():
                     image[ix,iy] += 1
             images.append(image[1:-1,1:-1])
         return np.array(images)
-            
+        
 
+particles_density = 100 #particules par micron
+dt = 0.001
+time = 3
+# Ds = [0.1e-12, 0.5e-12, 1e-12, 5e-12]
+D = 5e-13
+immobilitys = [0.2, 0.6, 0.9]
 
-particles_density = 200 #particules par micron
-dt = 0.005
-time = 5
-Ds = [2.5e-13, 1e-13, 0.5e-13,0.25e-13]
-immobility = 0
-
-sigma = 1e-6
+sigma = 2e-6
 radius = 0.5e-6
 pixel_size = 0.1e-6
-fov = 0.8*sigma
+fov = 3*radius
 confinement = sigma
 
 # Working many simulations
 
-
-for D in Ds:
-    image_set = []
-    for _ in tqdm(range(10)):
-        FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
-        FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
-        images = FRAP.generate_images(fov,pixel_size)
-        image_set.append(images)
-        plt.close()
-    image_set = np.array(image_set)
-    image_average = np.average(image_set, axis=0)
-    np.save(f'average_set_{time}s_{dt}dt_{D}D.npy', image_average)
+# for immobility in immobilitys:
+#     image_set = []
+#     for _ in tqdm(range(30)):
+#         FRAP = FRAPSimulator(particles_density,dt,time,D,immobility)
+#         FRAP.generate_trajectories(sigma,radius,confinement,verbose=False)
+#         images = FRAP.generate_images(fov,pixel_size)
+#         image_set.append(images)
+#         plt.close()
+#     image_set = np.array(image_set)
+#     image_average = np.average(image_set, axis=0)
+#     fn = f'average_set_{time}s_{dt}dt_{immobility}immobility_{D}D_30reps.npy'
+#     np.save(f'data\simulateur 2\{fn}', image_average)
 
 
 # Tracing FRAP curves, immobility
 
 # data = [0,0.2,0.4,0.6,0.8]
+# time = 3
+# dt = 0.001
 # i = 0
 # for info in data:
+#     filename = f'{time}s_{dt}dt_{info}imm'
+#     image_average = np.load(f'data\simulateur 2\\average_set_{filename}.npy')
+#     radius_pixels = int(radius/pixel_size)
+#     pix_num = image_average.shape[1]
+#     ROI = np.zeros((pix_num, pix_num)) 
+#     ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
+#     t_array = np.linspace(0,3,image_average.shape[0])
+#     image_average *= ROI
+#     trace = np.sum(image_average,axis=(1,2))
 #     if info == 0:
-#         filename = f'average_set_1.npy'
-#         image_average = np.load(f'data\simulateur 2\{filename}')[2:]
-#         radius_pixels = int(radius/pixel_size)
-#         pix_num = image_average.shape[1]
-#         ROI = np.zeros((pix_num, pix_num)) 
-#         ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
-#         t_array = np.linspace(0,3,image_average.shape[0])
-#         image_average *= ROI
-#         trace = np.sum(image_average,axis=(1,2))
-#         max_value = np.average(trace[500:])
-#         plt.plot(t_array,trace/max_value,color=colors[i],label = f'{round((1-info)*100)}%')
-#         print(max_value)
-#         i += 1
-#     else:
-#         filename = f'average_set_1_{info}.npy'
-#         image_average = np.load(f'data\simulateur 2\{filename}')[2:]
-#         radius_pixels = int(radius/pixel_size)
-#         pix_num = image_average.shape[1]
-#         ROI = np.zeros((pix_num, pix_num)) 
-#         ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
-#         t_array = np.linspace(0,3,image_average.shape[0])
-#         image_average *= ROI
-#         trace = np.sum(image_average,axis=(1,2))
-#         plt.plot(t_array,trace/max_value,color=colors[i],label = f'{round((1-info)*100)}%')
-#         i += 1
+#         max_value = np.average(trace[1000:-500])
+#     np.save(f'data/simulateur 2/trace_{filename}.npy', trace)
+#     plt.plot(t_array[:-500],trace[:-500]/max_value,color=colors[i],label = f'{round((1-info)*100)}%')
+#     i += 1
 # plt.minorticks_on()
 # plt.xlabel('Time (s)')
 # plt.ylabel('Fluorescence normalisée (a.u.)')
@@ -300,28 +289,29 @@ for D in Ds:
 
 # FRAP curves, D
 
-# data = [5.0,2.0,1.0,0.25,0.1]
-i = 0
-for info in Ds:
-    filename = f'average_set_{time}s_{dt}dt_{info}D.npy'
-    image_average = np.load(f'data\simulateur 2\{filename}')
-    radius_pixels = int(radius/pixel_size)
-    pix_num = image_average.shape[1]
-    ROI = np.zeros((pix_num, pix_num)) 
-    ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
-    t_array = np.linspace(0,5,image_average.shape[0])
-    image_average *= ROI
-    trace = np.sum(image_average,axis=(1,2))
-    if info == 2.5e-13:
-        max_value = np.max(trace)
-    plt.plot(t_array,trace/max_value,color=colors[i],label = f'D={round(info*1e12*100)/100}$\mu m^2/s$')
-    i += 1
-plt.minorticks_on()
-plt.xlabel('Time (s)')
-plt.ylabel('Fluorescence normalisée (a.u.)')
-plt.legend()
-plt.savefig('FRAP_D.pdf')
-plt.show()
+# data = [1e-13,2.2e-13,2.5e-13,3.5e-13,5e-13]
+# i = 0
+# for info in Ds:
+#     filename = f'{time}s_{dt}dt_{info}D'
+#     image_average = np.load(f'data/simulateur 2/average_set_{filename}.npy')
+#     radius_pixels = int(radius/pixel_size)
+#     pix_num = image_average.shape[1]
+#     ROI = np.zeros((pix_num, pix_num)) 
+#     ROI[int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1),int(pix_num/2 - radius_pixels): int(pix_num/2+radius_pixels+1)] = disk(radius_pixels)
+#     t_array = np.linspace(0,time,image_average.shape[0])
+#     image_average *= ROI
+#     trace = np.sum(image_average,axis=(1,2))
+#     if i==0:
+#         max_value = np.max(trace)
+#     np.save(f'data/simulateur 2/trace_{filename}.npy', trace)
+#     plt.plot(t_array,trace/max_value,color=colors[i],label = f'D={round(info*1e12*100)/100}$\mu m^2/s$')
+#     i += 1
+# plt.minorticks_on()
+# plt.xlabel('Time (s)')
+# plt.ylabel('Fluorescence normalisée (a.u.)')
+# plt.legend()
+# # plt.savefig('FRAP_D.pdf')
+# plt.show()
 
 
 # # FRAP curves, confinement
@@ -329,8 +319,8 @@ plt.show()
 # data = [5e-07,1e-06,'inf']
 # labels = [f'Tube: 2R', f'Tube: 4R', 'Diffusion libre']
 # i = 0
-# for info in data:
-#     filename = f'average_set_{info}.npy'
+# for info in confinements:
+#     filename = f'average_set_{time}s_{dt}dt_{info}.npy'
 #     image_average = np.load(f'data\simulateur 2\{filename}')[2:]
 #     radius_pixels = int(radius/pixel_size)
 #     pix_num = image_average.shape[1]
@@ -339,9 +329,8 @@ plt.show()
 #     t_array = np.linspace(0,5,image_average.shape[0])
 #     image_average *= ROI
 #     trace = np.sum(image_average,axis=(1,2))
-#     if info == 5e-07:
-#         max_value = np.average(trace)
-#         print(max_value)
+#     if confinements[0]:
+#         max_value = np.max(trace)
 #     plt.plot(t_array,trace/max_value,color=colors[i],label = labels[i])
 #     i += 1
 # plt.minorticks_on()
@@ -352,18 +341,24 @@ plt.show()
 # plt.show()
 
 
-
 # Generate Gif
+time = 3
+dt = 0.001
+pluses = ['1.5e-13D', '5e-12D']
 
-# image_average = np.load(r'average_set_0.5s_10e-5dt.npy')
+for plus in pluses:
 
-# def update_image(frame_id):
-#     image = image_average[frame_id]
-#     a_image.set_data(image)
+    fn = f'average_set_{time}s_{dt}dt_{plus}_30reps'
 
-# fig,ax=plt.subplots()
-# a_image = ax.imshow(image_average[0],cmap='gray')
-# ax.axis('off')
-# ani=animation.FuncAnimation(fig=fig,func=update_image,frames=tqdm(range(image_average.shape[0])),interval=3)
-# ani.save(f'FRAP_{time}s_{dt}dt.gif',writer='pillow')
-# # plt.show()
+    image_average = np.load(f'data\simulateur 2\{fn}.npy')
+
+    def update_image(frame_id):
+        image = image_average[frame_id]
+        a_image.set_data(image)
+
+    fig,ax=plt.subplots()
+    a_image = ax.imshow(image_average[0],cmap='gray')
+    ax.axis('off')
+    ani=animation.FuncAnimation(fig=fig,func=update_image,frames=tqdm(range(image_average.shape[0])),interval=dt*1000/3)
+    ani.save(f'FRAP_{fn}.gif',writer='pillow')
+    print('Done!')
