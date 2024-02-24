@@ -163,7 +163,7 @@ class ICSSimulator():
             set = sim.image
             image[m,n] = set[m,n]
         self.Images = np.transpose(image)
-        return np.transpose(set)
+        # return np.transpose(set)
     
 def SpatialAutocorrelation(image):
     FFT =np.fft.fft2(image)
@@ -172,6 +172,45 @@ def SpatialAutocorrelation(image):
     lowerterm = np.average(image)**2
     autocorr = upperterm/lowerterm - 1
     return  autocorr
+
+def G(epsilon, phi, N, wo, wz, tau_p, tau_l, gamma=0.3535):
+    """The component of the ACF due to diffusion is the traditional
+    correlation function.
+
+    Args:
+        epsilon (int): Spatial lag in pixel on the x axis.
+        phi (_type_): Spatiale lag in pizel on the y axis.
+        N (_type_): Number of particules.
+        wo (_type_): Point spread function of the laser.
+        wz (_type_): z-axis beam radius.
+        tau_p (_type_): Pixel dwell time in x.
+        tau_l (_type_): Pixel dwell time in y.
+        gamma (float, optional): Shape factor due to uneven illumination. Defaults to 0.3535.
+
+    Returns:
+        float: Traditional correlation function
+    """
+    return (gamma / N) * 1/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wo**2) * 1/np.sqrt(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wz**2)
+
+def S(epsilon, phi, D, delta_x, delta_y, tau_l, tau_p, wo):
+    """Correlation function decays due to movement of the laser beam scanning.
+
+    Args:
+        epsilon (_type_): Spatial lag in x
+        phi (_type_): Spatial lag in y
+        D (_type_): Diffusion coeff
+        delta_x (_type_): Pixel size in x
+        delta_y (_type_): Pixel size in y
+        tau_l (_type_): Interline time in y
+        tau_p (_type_): Pixel dwell time in x
+        wo (_type_): Point spread function of the laser beam.
+
+    Returns:
+        _type_: _description_
+    """
+    return np.exp(-1 * ((np.abs(epsilon) * delta_x / wo)**2 + (np.abs(phi) * delta_y /wo)**2)/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l *phi)/(wo**2))))
+
+
 
 
 
@@ -182,62 +221,17 @@ pixels = (50,10) # taille de l'image
 psf = 50e-9 # tache du fluorophre / taille du faisceau laser
 ps = 25e-9 # 
 time=2
-densitys = [0.02]
+density = 0.02
 
-for density in densitys:
-    print(density)
-    print('Generating trajectories...')
-    simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
-    simulator.GenerateTrajectories(D,density)
-    trajectories = simulator.Trajectories
-    print('Generating images...')
-    set = simulator.GenerateImage(10,False)
-    image_set = simulator.Images
+print('Generating trajectories...')
+simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
+simulator.GenerateTrajectories(D,density)
+print('Generating images...')
+simulator.GenerateImage(10,False)
+image_set = simulator.Images
 
-    np.save(f'simulateur 1/data/image_{dt}s_{D}_{psf}_{ps}_{density}.npy', image_set)
+# np.save(f'simulateur 1/data/image_{dt}s_{D}_{psf}_{ps}_{density}.npy', image_set)
 
 fig, ax1 = plt.subplots(1,1, figsize=(10,5))
 ax1.imshow(image_set, cmap = 'magma')
-# ax2.imshow(set, cmap = 'magma')
-# for particle in trajectories.keys():
-#     trajectory = trajectories[particle]
-#     ax2.plot(trajectory[0], trajectory[1])
-# ax2.vlines([-pixels[1]/2*ps, pixels[1]/2*ps], -pixels[0]/2*ps, pixels[0]/2*ps, color = 'k')
-# ax2.hlines([-pixels[0]/2*ps, pixels[0]/2*ps], -pixels[1]/2*ps, pixels[1]/2*ps, color = 'k')
 plt.show()
-
-# image = image_set
-
-# fns = ['simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.1.npy',
-#        'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.25.npy', 
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.5.npy",
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_1.npy", 
-#       'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_2.5.npy', 
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_5.npy",
-#       'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_10.npy']
-
-# for fn in fns:
-#     image = np.load(fn)
-
-#     fig = plt.figure(figsize=(11,5),layout='tight')
-#     (ax1,ax2) = fig.subfigures(1,2)
-#     ax2 = ax2.subplots(subplot_kw=dict(projection='3d'))
-#     ax1 = ax1.subplots()
-#     ax1.set_ylim(image.shape[1], 0)
-#     ax1.set_title('a) Image résultante')
-#     ax1.imshow(image,cmap='bone')
-#     ax1.axis('off')
-
-#     autocorr = SpatialAutocorrelation(image)
-
-
-#     x = np.arange(image.shape[0])
-#     y = np.arange(image.shape[0])
-#     x,y = np.meshgrid(x,y)
-#     ax2.plot_surface(x,y,autocorr, cmap = 'cividis')
-#     ax2.set_title('B) Autocorrelation function')
-#     ax2.set_xlabel(r'$\xi$')
-#     ax2.set_ylabel(r'$\nu$')
-#     ax2.set_zlabel(r'G($\xi$,$\nu$)')
-#     plt.savefig('simulateur 1/figures/fig_{fn}.svg')
-#     plt.show()
