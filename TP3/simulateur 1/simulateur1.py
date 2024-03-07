@@ -136,7 +136,7 @@ class ICSSimulator():
             interest_zone = np.sqrt(2)*fov_y/2
         else:
             interest_zone = np.sqrt(2)*fov_x/2
-        N = int(particledensity*(fov_x*fov_y)/(np.pi*(self.PSF/2)**2))
+        N = int(particledensity*(fov_x*fov_y)/(np.pi*(self.PSF)**2))
         for i in tqdm(range(N)):
             center = (np.inf, np.inf)
             while np.abs(center[1])>fov_x/2 or np.abs(center[0])>fov_y/2:
@@ -157,77 +157,50 @@ class ICSSimulator():
             m = i % pixel_x
             for particle in self.Trajectories.keys():
                 position = (self.Trajectories[particle][1][i],self.Trajectories[particle][0][i])
-                if np.abs(position[0]) < (pixel_x-1)/2*ps or np.abs(position[1]) < (pixel_y-1)/2*ps:
-                    sim.emetteur(psf, position, intensity)
+                if np.abs(position[0]) < (pixel_x-1)/2*pixel_size or np.abs(position[1]) < (pixel_y-1)/2*pixel_size:
+                    sim.emetteur(psf/2, position, intensity)
             if shotnoise:
                 sim.photon_counting()
             set = sim.image
             image[m,n] = set[m,n]
-        self.Images = np.transpose(image)
-        # return np.transpose(set)
+        image = np.transpose(image)
+
+        image -= np.min(image)
+        self.Images = (255 * image / np.max(image)).astype(np.uint8)
+        return np.transpose(set)
     
-# def SpatialAutocorrelation(image):
-#     FFT =np.fft.fft2(image)
-#     FFTstar = np.conjugate(FFT)
-#     upperterm = np.abs(np.fft.fftshift(np.fft.ifft2(FFT*FFTstar)))
-#     lowerterm = np.average(image)**2
-#     autocorr = upperterm/lowerterm - 1
-#     return  autocorr
 
-def G(xy, N, wo, wz, tau_p, tau_l, D, gamma=0.3535):
-    """The component of the ACF due to diffusion is the traditional
-    correlation function.
+# def AutocorrelationFit(data,a,b,c,d):
+#     center=10
+#     pos = np.dstack(data)
+#     gaussienne = stats.multivariate_normal([center, center], [[b,0],[0,d]]).pdf(pos)
+#     gaussienne /= np.max(gaussienne)
 
-    Args:
-        epsilon (int): Spatial lag in pixel on the x axis.
-        phi (_type_): Spatiale lag in pizel on the y axis.
-        N (_type_): Number of particules.
-        wo (_type_): Point spread function of the laser.
-        wz (_type_): z-axis beam radius.
-        tau_p (_type_): Pixel dwell time in x.
-        tau_l (_type_): Pixel dwell time in y.
-        D (float): Diffusion coefficient
-        gamma (float, optional): Shape factor due to uneven illumination. Defaults to 0.3535.
-
-    Returns:
-        float: Traditional correlation function
-    """
-    epsilon, phi = xy
-    g = (gamma / N) * 1/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wo**2) * 1/np.sqrt(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wz**2)
-    return g.ravel()
-
-def S(epsilon, phi, D, delta_x, delta_y, tau_l, tau_p, wo):
-    """Correlation function decays due to movement of the laser beam scanning.
-
-    Args:
-        epsilon (_type_): Spatial lag in x
-        phi (_type_): Spatial lag in y
-        D (_type_): Diffusion coeff
-        delta_x (_type_): Pixel size in x
-        delta_y (_type_): Pixel size in y
-        tau_l (_type_): Interline time in y
-        tau_p (_type_): Pixel dwell time in x
-        wo (_type_): Point spread function of the laser beam.
-
-    Returns:
-        _type_: _description_
-    """
-    return np.exp(-1 * ((np.abs(epsilon) * delta_x / wo)**2 + (np.abs(phi) * delta_y /wo)**2)/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l *phi)/(wo**2))))
+#     return (a*gaussienne + c).ravel()
 
 
 
-
-
-def AutocorrelationFit(data,a,b,c,d):
-    center=10
+def AutocorrelationFit(data, epsilon, psi, diff_coef):
+    center=15
     pos = np.dstack(data)
-    gaussienne = stats.multivariate_normal([center, center], [[b**2,0],[0,d**2]]).pdf(pos)
+    tau_p = 8e-6
+    tau_l = 20 * tau_p
+    N = 7
+    wo = 2#50e-9
+    wz = 3*wo
+    delta_x = 1#25e-9
+    delta_y = 1#25e-9
+
+    rep_num = 4 * diff_coef * (tau_p * np.abs(epsilon) + tau_l * np.abs(psi))
+    denum = 1 + rep_num/(wo**2)
+    a = (0.3535 / N) * ((1 + rep_num/(wo**2))**-1) * (np.sqrt(1 + rep_num/(wz**2)))**-1
+    b = (np.abs(epsilon) * delta_x / wo)**2 / denum
+    d = (np.abs(psi) * delta_y / wo)**2 / denum
+    gaussienne = stats.multivariate_normal([center, center], [[b,0],[0,d]],
+                                           allow_singular=True).pdf(pos)
     gaussienne /= np.max(gaussienne)
 
-    return (a*gaussienne + c).ravel()
-
-
-
+    return (a*gaussienne).ravel()
 
 
 
@@ -252,7 +225,11 @@ def SpatialAutocorrelation(image):
     return  np.fft.ifftshift(autocorr.reshape(shape)) # reshaping into image shape and shifting to bring the peaks at the center
 
 
-def gs(xy, N, wo, wz, tau_p, tau_l, delta_x, delta_y, D):
+
+
+
+
+def overall_acf(xy, epsilon, phi):
     """The component of the ACF due to diffusion is the traditional
     correlation function.
 
@@ -262,14 +239,23 @@ def gs(xy, N, wo, wz, tau_p, tau_l, delta_x, delta_y, D):
         N (_type_): Number of particules.
         wo (_type_): Point spread function of the laser.
         wz (_type_): z-axis beam radius.
-        tau_p (_type_): Pixel dwell time in x.
-        tau_l (_type_): Pixel dwell time in y.
+        tau_p (_type_): Pixel dwell time.
+        tau_l (_type_): Interline time.
         D (float): Diffusion coefficient
 
     Returns:
         float: Traditional correlation function
     """
-    epsilon, phi = xy
+    N = 1
+    D = 1e-12
+    wo = 50e-9
+    wz = 3 * wo
+    tau_p = 8e-6
+    tau_l = 20 * tau_p
+    # delta_x = 25e-9
+    # delta_y = 25e-9
+
+    delta_x, delta_y = xy
     g = (0.3535 / N) * 1/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wo**2) * 1/np.sqrt(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l * np.abs(phi)))/wz**2)
 
     s = np.exp(-1 * ((np.abs(epsilon) * delta_x / wo)**2 + (np.abs(phi) * delta_y /wo)**2)/(1 + (4 * D * (tau_p * np.abs(epsilon) + tau_l *phi)/(wo**2))))
@@ -281,26 +267,25 @@ def fit_2d_eq27(x, y, z, initial_guess):
     y_data_flat = y.ravel()
     z_data_flat = z.ravel()
 
-    popt, pcov = curve_fit(gs, (x_data_flat, y_data_flat), z_data_flat, p0=initial_guess)
+    popt, pcov = curve_fit(overall_acf, (x_data_flat, y_data_flat), z_data_flat)
 
     return popt
 
 
 
-dt = 10e-6 # pixel dwell time
+pixel_dwell_time = 8e-6 # pixel dwell time
 D = 1e-12 # coefficient de diffusion
-nx = 20
-ny = 20
+nx = 30
+ny = 30
 pixels = (nx,ny) # taille de l'image
 psf = 50e-9 # tache du fluorophore / taille du faisceau laser
-ps = 25e-9
-time = 2
-density = 1#0.6#0.02
+pixel_size = 25e-9
+density = 1
 
 
 
 print('Generating trajectories...')
-simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
+simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, pixel_size, pixel_dwell_time)
 simulator.GenerateTrajectories(D,density)
 print('Generating images...')
 simulator.GenerateImage(10,False)
@@ -313,10 +298,12 @@ image = image_set
 autocorr = SpatialAutocorrelation(image_set)
 
 fig = plt.figure(figsize=(10,4))
-(ax1, ax2, ax3) = fig.subfigures(1, 3)
+(ax1, ax2, ax3, ax4, ax5) = fig.subfigures(1, 5)
 ax1 = ax1.subplots()
 ax2 = ax2.subplots(subplot_kw=dict(projection='3d'))
 ax3 = ax3.subplots()
+ax4 = ax4.subplots()
+ax5 = ax5.subplots()
 ax1.set_ylim(image.shape[1], 0)
 ax1.set_title('a) Image résultante')
 ax1.imshow(image,cmap='bone')
@@ -331,37 +318,46 @@ ax2.set_xlabel(r'$\xi$')
 ax2.set_ylabel(r'$\nu$')
 ax2.set_zlabel(r'G($\xi$,$\nu$)')
 
-popt = fit_2d_eq27(x, y, autocorr, [7, 50e-9, 150e-9, 10e-6, 10e-6, 25e-9, 25e-9, 1e-12])
+# popt = fit_2d_eq27(x, y, autocorr, [7, 50e-9, 150e-9, 10e-6, 10e-6, 25e-9, 25e-9, 1e-12])
+
+# ax3.plot(autocorr.ravel())
+# ax3.plot(overall_acf((x,y), *popt))
 
 
-# fig, (ax0, ax1) = plt.subplots(2)
-ax3.plot(autocorr.ravel())
-ax3.plot(gs((x,y), *popt))
-# ax3.imshow(gs((x,y), *popt).reshape((20,20)))
-# ax3.imshow(autocorr, cmap="magma")
+# ax4.imshow(autocorr, cmap="magma")
+# ax5.imshow(overall_acf((x,y), *popt).reshape((20,20)))
+# plt.show()
+
+
+
+
+
+(epsilon, psi, diff_coeff), pcov = curve_fit(AutocorrelationFit,
+                                        (x,y),
+                                        autocorr.ravel(),
+                                        p0=[1, 1, 3e-12],
+                                        maxfev=10000,
+                                        bounds=(0, 20))
+
+
+print(epsilon, psi, diff_coeff)
+
+ax3.plot(autocorr.ravel(), label="autocorr")
+ax3.plot(AutocorrelationFit((x,y),epsilon, psi, diff_coeff), label="Fit")
+ax3.legend()
+
+ax4.imshow(autocorr, cmap="magma")
+
+fit_image =AutocorrelationFit((x,y),epsilon, psi, diff_coeff).reshape(image.shape)
+
+ax5.imshow(fit_image)
 plt.show()
 
 
+fit_axis_x = fit_image[fit_image.shape[0]//2,fit_image.shape[0]//2:]
+fit_axis_y = fit_image[fit_image.shape[0]//2:,fit_image.shape[0]//2]
 
 
-
-
-# (amplitude, std, extra, extra2), pcov = curve_fit(AutocorrelationFit,(x,y),
-#                                         autocorr.ravel(),p0=[5000,3,2500,3])
-# ax3.plot(autocorr.ravel(), label="autocorr")
-# ax3.plot(AutocorrelationFit((x,y),amplitude,std,extra, extra2), label="Fit")
-# ax3.legend()
-# plt.show()
-
-# fit_image = AutocorrelationFit((x,y),amplitude,std,extra, extra2).reshape(image.shape)
-
-# plt.imshow(fit_image)
-# plt.show()
-
-# fit_axis_x = fit_image[fit_image.shape[0]//2,fit_image.shape[0]//2:]
-# fit_axis_y = fit_image[fit_image.shape[0]//2:,fit_image.shape[0]//2]
-
-
-# plt.plot(fit_axis_x)
-# plt.plot(fit_axis_y)
-# plt.show()
+plt.plot(fit_axis_x)
+plt.plot(fit_axis_y)
+plt.show()
