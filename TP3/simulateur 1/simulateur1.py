@@ -1,8 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from skimage.morphology import disk
 from scipy import stats
+from scipy.optimize import curve_fit
+from scipy.ndimage import correlate
+
 
 colors = ['#003D5B', '#D1495B', '#EDAE49', '#00798C', '#401F3E','blue','green','black','red']
 
@@ -12,6 +14,14 @@ def find_nearest(array, value):
     return idx
 
 class Image_Simulator():
+    """
+    Class to simulate a frame given by diffusing particles
+
+    Args:
+    pixel_size (float): size of the pixels of the image
+    pixel_numberx (int): number of pixels in x
+    pixel_numbery (int): number of pixels in y
+    """
 
     def __init__(self, pixel_size, pixel_numberx, pixel_numbery):
         self.pixel_size = pixel_size
@@ -20,13 +30,20 @@ class Image_Simulator():
         self.image = np.zeros((pixel_numberx, pixel_numbery))
     
     def emetteur(self, spot_size, center, N_photon):  
+        """method to add an emettor in the image
+
+        Args:
+            spot_size (float): spot size in m
+            center (float): center in m
+            N_photon (number of photons of the ): _description_
+        """
         def gaussian2D(x0,y0,s):
             x, y = np.meshgrid(np.arange(-self.pixel_x/2, self.pixel_x/2), np.arange(-self.pixel_y/2, self.pixel_y/2))
             pos = np.dstack((x,y))
             gaussienne = stats.multivariate_normal([x0,y0], [[s**2,0],[0,s**2]]).pdf(pos)
             if np.nansum(gaussienne) == 0:
-                return gaussienne
-            return (N_photon * gaussienne/np.nansum(gaussienne))
+                return N_photon * gaussienne
+            return (N_photon * gaussienne/np.max(gaussienne))
         x0, y0 = center
         x0 /= self.pixel_size
         y0 /= self.pixel_size
@@ -135,8 +152,10 @@ class ICSSimulator():
             interest_zone = np.sqrt(2)*fov_y/2
         else:
             interest_zone = np.sqrt(2)*fov_x/2
-        N = int(particledensity*(fov_x*fov_y)/(np.pi*(self.PSF/2)**2))
-        for i in tqdm(range(N)):
+
+        N = int(particledensity*(fov_x*fov_y)/(np.pi*(self.PSF)**2)/3) ## Changed this
+        
+        for i in range(N): #tqdm here
             center = (np.inf, np.inf)
             while np.abs(center[1])>fov_x/2 or np.abs(center[0])>fov_y/2:
                 center = np.random.uniform(-interest_zone,interest_zone,2)
@@ -150,94 +169,156 @@ class ICSSimulator():
         pixel_x = int(self.PixelNumber/self.PixelLines)
         pixel_y = int(self.PixelLines)
         image = np.empty((pixel_x, pixel_y))
-        for i in tqdm(range(self.PixelNumber)):
+        for i in range(self.PixelNumber): #tqdm here
             sim = Image_Simulator(self.PixelSize, pixel_x, pixel_y)
             n = i // pixel_x
             m = i % pixel_x
             for particle in self.Trajectories.keys():
-                position = (self.Trajectories[particle][1][i],self.Trajectories[particle][0][i])
-                if np.abs(position[0]) < (pixel_x-1)/2*ps or np.abs(position[1]) < (pixel_y-1)/2*ps:
-                    sim.emetteur(psf, position, intensity)
+                position = (self.Trajectories[particle][0][i],self.Trajectories[particle][1][i])
+                # if np.abs(position[0]) < (pixel_x)/2*ps or np.abs(position[1]) < (pixel_y)/2*ps:
+                sim.emetteur(psf, position, intensity) # changed this
             if shotnoise:
                 sim.photon_counting()
             set = sim.image
             image[m,n] = set[m,n]
-        self.Images = np.transpose(image)
+        image = np.transpose(image)
+
+        #converting to 8 bit image
+        image -= np.min(image)
+        self.Images = (255*image/np.max(image)).astype(np.uint8) # ajouté des trucs tantot
         return np.transpose(set)
     
 def SpatialAutocorrelation(image):
-    FFT =np.fft.fft2(image)
-    FFTstar = np.conjugate(FFT)
-    upperterm = np.abs(np.fft.fftshift(np.fft.ifft2(FFT*FFTstar)))
-    lowerterm = np.average(image)**2
-    autocorr = upperterm/lowerterm - 1
-    return  autocorr
+    """Fonction pour que antoine comprenne mon code  (tu le comprendra pas mon esti)
+    There is still a factor 10 in the results (about 10)
+
+    Args:
+        image (array): image to do the autocorrelation of
+
+    Returns:
+        autocorr (array): array of image with the autocorrelation function following equation 7 from the paper
+    """
+    shape = image.shape # Calculating the shape of the image
+    image = image.ravel() # Flattening the image so it is a 1D array
+    mean_image = np.average(image) # Calculating the mean pixel intensity
+    normalized_image = image - mean_image # Normalizing following equation 2
+    signal_1, signal_2 = normalized_image, normalized_image # assigning the normalized image to both signal 1 and signal 2 
+    autocorr = [] #creating a list to put our autocorrelation values in
+    for _ in range(image.shape[0]): #iterating for the shape of the array
+        autocorr.append(np.average(signal_1*signal_2)/mean_image**2) # Equation 7
+        signal_1 = np.roll(signal_1, 1) # Moving signal_1
+    autocorr = np.array(autocorr) # transforming autocorrelation in array for futur operations
+    return  np.fft.ifftshift(autocorr.reshape(shape)) # reshaping into image shape and shifting to bring the peaks at the center
+
+def AutocorrelationFit(data,a,b,c):
+    center=data.shape[1]/2
+    # center = 10
+    pos = np.dstack(data)
+    gaussienne = stats.multivariate_normal([center, center], [[b**2,0],[0,b**2]]).pdf(pos)
+    gaussienne /= np.max(gaussienne)
+    return (a*gaussienne + c).ravel()
 
 
-
-
-dt = 10e-6 # pixel dwell time
+dt = 5e-7 # pixel dwell time
 D = 1e-12 # coefficient de diffusion
-pixels = (50,10) # taille de l'image
-psf = 50e-9 # tache du fluorophre / taille du faisceau laser
-ps = 25e-9 # 
-time=2
-densitys = [0.02]
+pixels = (50,50) # taille de l'image
+psf = 200e-9 # tache du fluorophre / taille du faisceau laser
+pss = [450e-9,500e-9,600e-9] # taille des pixels de l'image
+density = 0.01
+ # densité de particule / faisceau laser
+intensity = 500
 
-for density in densitys:
-    print(density)
-    print('Generating trajectories...')
-    simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
-    simulator.GenerateTrajectories(D,density)
-    trajectories = simulator.Trajectories
-    print('Generating images...')
-    set = simulator.GenerateImage(10,False)
-    image_set = simulator.Images
+for ps in pss:
+    fit_1 = []
+    for _ in tqdm(range(50)):
+        simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
+        simulator.GenerateTrajectories(D,density) 
+        trajectories = simulator.Trajectories
+        simulator.GenerateImage(intensity,True)
+        image = simulator.Images
 
-    np.save(f'simulateur 1/data/image_{dt}s_{D}_{psf}_{ps}_{density}.npy', image_set)
+        autocorr = SpatialAutocorrelation(image)
+        x = np.arange(image.shape[0])
+        y = np.arange(image.shape[0])
+        x,y = np.meshgrid(x,y)
+        popt, pcov = curve_fit(AutocorrelationFit,(x,y),autocorr.ravel())
+        mean_image = np.average(image)
+        upperterm = np.mean((image-mean_image)**2)
+        fit_1.append([mean_image**2/upperterm,popt[0],popt[1],popt[2]])
+    fit_1 = np.array(fit_1)
+    np.save(f'simulateur 1/data/pixel size/fit_{dt}s_{D}_{psf}_{ps}_{density}ems_{intensity}photons.npy',fit_1)
+    np.save(f'simulateur 1/data/pixel size/image_{dt}s_{D}_{psf}_{ps}_{density}ems_{intensity}photons.npy', image)
+    mean = np.mean(fit_1[:,0])
+    mean2 = np.mean(fit_1[:,1])
+    std = np.mean(fit_1[:,2])
+    c = np.mean(fit_1[:,3])
+    print('Moyenne:', mean)
+    print('Moyenne 2:', 1/mean2)
+    print('STD', std)
+    print('C', c)
 
-fig, ax1 = plt.subplots(1,1, figsize=(10,5))
-ax1.imshow(image_set, cmap = 'magma')
+# plt.plot(autocorr.ravel())
+# plt.plot(AutocorrelationFit((x,y),mean2,std,c))
+# plt.show()
+                    
+
+
+#     np.save(f'simulateur 1/data/image_{dt}s_{D}_{psf}_{ps}_{density}ems_{intensity}photons.npy', image_set)
+
+
+# fig, ax1 = plt.subplots(1,1, figsize=(10,5))
+# ax1.imshow(image_set, cmap = 'magma')
 # ax2.imshow(set, cmap = 'magma')
 # for particle in trajectories.keys():
 #     trajectory = trajectories[particle]
 #     ax2.plot(trajectory[0], trajectory[1])
 # ax2.vlines([-pixels[1]/2*ps, pixels[1]/2*ps], -pixels[0]/2*ps, pixels[0]/2*ps, color = 'k')
 # ax2.hlines([-pixels[0]/2*ps, pixels[0]/2*ps], -pixels[1]/2*ps, pixels[1]/2*ps, color = 'k')
-plt.show()
+# plt.show()
+
+
 
 # image = image_set
 
-# fns = ['simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.1.npy',
-#        'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.25.npy', 
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_0.5.npy",
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_1.npy", 
-#       'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_2.5.npy', 
-#       "simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_5.npy",
-#       'simulateur 1\data\image_1e-07s_1e-12_5e-08_2.5e-08_10.npy']
+durations = [1e-5,1e-6,1e-7,2.5e-5,2.5e-6,5e-6,5e-7]
+durations = [1e-6]
+# density = 0.5
 
-# for fn in fns:
-#     image = np.load(fn)
+# for dt in durations:
 
-#     fig = plt.figure(figsize=(11,5),layout='tight')
+#     # fn = f'image_{dt}s_{D}_{psf}_{ps}_{density}'
+#     # fn = 'image_5e-07s_1e-12_2e-07_1e-07_1ems_500photons'
+#     # # # fn = 'image_1e-06s_1e-12_2e-07_1e-07_10'
+#     # image = np.load('simulateur 1/data/duration/' + fn + '.npy')
+#     autocorr = SpatialAutocorrelation(image.astype(int))
+#     fig = plt.figure(figsize=(10,4))
 #     (ax1,ax2) = fig.subfigures(1,2)
 #     ax2 = ax2.subplots(subplot_kw=dict(projection='3d'))
 #     ax1 = ax1.subplots()
-#     ax1.set_ylim(image.shape[1], 0)
-#     ax1.set_title('a) Image résultante')
+#     # ax1.set_ylim(image.shape[1], 0)
+#     # ax1.set_title('a) Image résultante')
 #     ax1.imshow(image,cmap='bone')
-#     ax1.axis('off')
-
-#     autocorr = SpatialAutocorrelation(image)
-
-
+#     # ax1.axis('off')
 #     x = np.arange(image.shape[0])
 #     y = np.arange(image.shape[0])
 #     x,y = np.meshgrid(x,y)
+#     # ax1.plot(autocorr.ravel())
 #     ax2.plot_surface(x,y,autocorr, cmap = 'cividis')
 #     ax2.set_title('B) Autocorrelation function')
 #     ax2.set_xlabel(r'$\xi$')
 #     ax2.set_ylabel(r'$\nu$')
 #     ax2.set_zlabel(r'G($\xi$,$\nu$)')
-#     plt.savefig('simulateur 1/figures/fig_{fn}.svg')
-#     plt.show()
+#     (amplitude, std, extra), pcov = curve_fit(AutocorrelationFit,(x,y),autocorr.ravel())
+#     # ax1.plot(AutocorrelationFit((x,y),amplitude,std,extra))
+#     print("Given density:", density)
+#     print("Fit density:", 1/amplitude)
+#     # plt.savefig(f'simulateur 1/figures/fig_{fn}.svg')
+#     # plt.show()
+
+#     mean_image = np.average(image)
+#     upperterm = np.mean((image-mean_image)**2)
+#     print('Calculated density:',1/upperterm*mean_image**2)
+
+
+
+# # note à sandrine: regarder psf des points et psf du laser svplpease
