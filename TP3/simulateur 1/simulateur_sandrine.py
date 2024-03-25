@@ -313,8 +313,67 @@ def g_function(data, diff_coeff, N):
 ##################
 
 
-# dt = 50e-6 # pixel dwell time
-D = 1e-12 # coefficient de diffusion
+# # dt = 50e-6 # pixel dwell time
+# D = 1e-12 # coefficient de diffusion
+# pixels = (50,50) # taille de l'image
+# psf = 200e-9 # tache du fluorophre / taille du faisceau laser
+# # pss = [450e-9,500e-9,600e-9] # taille des pixels de l'image
+# ps = 100e-9
+# density = 0.1
+#  # densité de particule / faisceau laser
+# intensity = 500
+
+
+# for j in tqdm([50e-9, 50e-6, 50e-3]):
+    
+#     def g_function(data, diff_coeff, N):
+#         tau = j
+#         print(tau)
+#         wo=200e-9
+#         g = (0.3535 / N) * 1/((1 + 4 * diff_coeff * tau * data / np.square(wo))**3/2)
+#         return g
+#     for k in tqdm(range(1)):
+#         simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, j)
+#         simulator.GenerateTrajectories(D,density)
+#         trajectories = simulator.Trajectories
+#         simulator.GenerateImage(intensity,True)
+#         image = simulator.Images
+
+#         autocorr = SpatialAutocorrelation(image)
+
+        
+
+
+#         signal = autocorr[autocorr.shape[0]//2,autocorr.shape[0]//2:]
+
+#         (d_c, n), pcov = curve_fit(g_function,
+#                                 np.arange(25),
+#                                 signal,
+#                                 p0=[1e-12, 21],
+#                                 maxfev=10000,
+#                                 bounds=(0, 1000))
+        
+#         fig, (ax0, ax1, ax2) = plt.subplots(3)
+
+#         ax0.imshow(image)
+#         ax1.imshow(autocorr)
+#         ax2.plot(signal)
+#         ax2.plot(np.arange(25), g_function(np.arange(25), d_c, n))
+#         plt.show()
+
+#         with open("data/question_3/data.txt", "a") as f:
+#             f.write(f"dwelltime_{j}_{k}\t{d_c}\n")
+
+
+
+
+##################
+### Question C ###
+##################
+
+
+dt = 50e-9 # pixel dwell time
+# D = 1e-12 # coefficient de diffusion
 pixels = (50,50) # taille de l'image
 psf = 200e-9 # tache du fluorophre / taille du faisceau laser
 # pss = [450e-9,500e-9,600e-9] # taille des pixels de l'image
@@ -324,21 +383,25 @@ density = 0.1
 intensity = 500
 
 
-for j in tqdm([50e-9, 50e-6, 50e-3]):
+for j in tqdm(np.linspace(0.1e-12, 100e-12)):
     
     def g_function(data, diff_coeff, N):
-        tau = j
+        tau = 50e-9
         wo=200e-9
         g = (0.3535 / N) * 1/((1 + 4 * diff_coeff * tau * data / np.square(wo))**3/2)
         return g
-    for k in tqdm(range(50)):
-        simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, j)
-        simulator.GenerateTrajectories(D,density)
+    
+
+    for k in tqdm(range(10)):
+        simulator = ICSSimulator(pixels[0]*pixels[1], pixels[1], psf, ps, dt)
+        simulator.GenerateTrajectories(j,density)
         trajectories = simulator.Trajectories
         simulator.GenerateImage(intensity,True)
         image = simulator.Images
 
         autocorr = SpatialAutocorrelation(image)
+
+        
 
 
         signal = autocorr[autocorr.shape[0]//2,autocorr.shape[0]//2:]
@@ -349,6 +412,6 @@ for j in tqdm([50e-9, 50e-6, 50e-3]):
                                 p0=[1e-12, 21],
                                 maxfev=10000,
                                 bounds=(0, 1000))
+        with open("data/question_4/data.txt", "a") as f:
+            f.write(f"dwell_diff_{j}_{k}\t{d_c}\n")
 
-        with open("data/question_3/data.txt", "a") as f:
-            f.write(f"dwelltime_{j}_{k}\t{d_c}\n")
